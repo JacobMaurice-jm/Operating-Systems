@@ -33,9 +33,9 @@ int main(int argc, char *argv[])
 {
 
    int i,j;         /*indexes into arrays */
-   char *cmd1[10];  /*array for arguments of first command */
-   char *cmd2[10];  /*array for arguments of second command */
-   char *cmd3[10];  /*array for arguments of third command */
+   char *cmd1[20];  /*array for arguments of first command */
+   char *cmd2[20];  /*array for arguments of second command */
+   char *cmd3[20];  /*array for arguments of third command */
    if(argc == 1)
    {
      printf("Usage: dp <cmd1 arg...> : <cmd2 arg...> : <cmd3 arg....>\n");
@@ -120,23 +120,23 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
         close(pipe_fd1[1]); // Close write end of pipe_fd1
         close(pipe_fd2[0]); // Close read end of pipe_fd2
 
-        // Redirect standard input to read from the pipe_fd1
-        dup2(pipe_fd1[0], STDIN_FILENO);
+        char buffer[4096];
+        ssize_t bytes_read;
+
+        // Read from pipe_fd1 and write to cmd2
+        while ((bytes_read = read(pipe_fd1[0], buffer, sizeof(buffer))) > 0)
+        {
+            write(STDOUT_FILENO, buffer, bytes_read);
+        }
 
         // Close the remaining pipe ends
         close(pipe_fd1[0]);
+        close(pipe_fd2[1]);
 
-        // Execute cmd2
-        execvp(cmd2[0], cmd2);
-
-        // This line should not be reached unless there is an error in execvp
-        perror("Execvp failed");
-        exit(EXIT_FAILURE);
+        exit(EXIT_SUCCESS);
     }
     else
     {
-        // Parent process
-
         // Fork the second child process (cmd3)
         if ((pid2 = fork()) == -1)
         {
@@ -150,24 +150,26 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
 
             // Close unnecessary pipe ends
             close(pipe_fd1[0]); // Close read end of pipe_fd1
+            close(pipe_fd1[1]); // Close write end of pipe_fd1
             close(pipe_fd2[1]); // Close write end of pipe_fd2
 
-            // Redirect standard input to read from the pipe_fd2
-            dup2(pipe_fd2[0], STDIN_FILENO);
+            char buffer[4096];
+            ssize_t bytes_read;
+
+            // Read from pipe_fd2 and write to cmd3
+            while ((bytes_read = read(pipe_fd2[0], buffer, sizeof(buffer))) > 0)
+            {
+                write(STDOUT_FILENO, buffer, bytes_read);
+            }
 
             // Close the remaining pipe ends
             close(pipe_fd2[0]);
 
-            // Execute cmd3
-            execvp(cmd3[0], cmd3);
-
-            // This line should not be reached unless there is an error in execvp
-            perror("Execvp failed");
-            exit(EXIT_FAILURE);
+            exit(EXIT_SUCCESS);
         }
         else
         {
-            // Parent process (still)
+            // Parent process
 
             // Close unnecessary pipe ends
             close(pipe_fd1[0]); // Close read end of pipe_fd1
