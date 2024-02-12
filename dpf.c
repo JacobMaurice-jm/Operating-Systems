@@ -16,8 +16,8 @@ Description:  Double pipe program.  To pipe the output from the standard
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sys/types.h>
-
+<sys/types.h>
+          
 /* prototypes */
 int doublePipe(char **,char **,char **);
 
@@ -33,9 +33,9 @@ int main(int argc, char *argv[])
 {
 
    int i,j;         /*indexes into arrays */
-   char *cmd1[20];  /*array for arguments of first command */
-   char *cmd2[20];  /*array for arguments of second command */
-   char *cmd3[20];  /*array for arguments of third command */
+   char *cmd1[10];  /*array for arguments of first command */
+   char *cmd2[10];  /*array for arguments of second command */
+   char *cmd3[10];  /*array for arguments of third command */
    if(argc == 1)
    {
      printf("Usage: dp <cmd1 arg...> : <cmd2 arg...> : <cmd3 arg....>\n");
@@ -91,81 +91,24 @@ Description:  Starts three processes, one for each of cmd1, cmd2, and cmd3.
           The parent process will receive the output from cmd1 and
           copy the output to the other two processes.
 -------------------------------------------------------------------------*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
-#define BUFFER_SIZE 4096
-
-/* prototypes */
-int doublePipe(char **, char **, char **);
-
-int main(int argc, char *argv[])
-{
-    int i, j;
-    char *cmd1[20];  // Array for arguments of the first command
-    char *cmd2[20];  // Array for arguments of the second command
-    char *cmd3[20];  // Array for arguments of the third command
-
-    if (argc == 1)
-    {
-        printf("Usage: dp <cmd1 arg...> : <cmd2 arg...> : <cmd3 arg....>\n");
-        exit(1);
-    }
-
-    /* Parsing command line arguments */
-    for (i = 1, j = 0; i < argc; i++, j++)
-    {
-        if (!strcmp(argv[i], ":"))
-            break; /* found first command */
-        cmd1[j] = argv[i];
-    }
-    cmd1[j] = NULL;
-
-    if (i == argc) /* missing : */
-    {
-        printf("Bad command syntax - only one command found\n");
-        exit(1);
-    }
-    else
-        i++;
-
-    for (j = 0; i < argc; i++, j++)
-    {
-        if (!strcmp(argv[i], ":"))
-            break; /* found second command */
-        cmd2[j] = argv[i];
-    }
-    cmd2[j] = NULL;
-
-    if (i == argc) /* missing : */
-    {
-        printf("Bad command syntax - only two commands found\n");
-        exit(1);
-    }
-    else
-        i++;
-
-    for (j = 0; i < argc; i++, j++)
-        cmd3[j] = argv[i];
-    cmd3[j] = NULL;
-
-    if (j == 0) /* no command after last : */
-    {
-        printf("Bad command syntax - missing third command\n");
-        exit(1);
-    }
-
-    exit(doublePipe(cmd1, cmd2, cmd3));
-}
+#define SIZE 4096
 
 int doublePipe(char **cmd1, char **cmd2, char **cmd3)
 {
     int pipe_fd1[2]; // Pipe between cmd1 and cmd2
     int pipe_fd2[2]; // Pipe between cmd1 and cmd3
+    int pipe_fd3[2];
+    char buffer[SIZE];
+    ssize_t bytes_read;
 
     if (pipe(pipe_fd1) == -1 || pipe(pipe_fd2) == -1)
     {
@@ -175,8 +118,8 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
 
     pid_t pid1, pid2, pid3;
 
-    if ((pid1 = fork()) == -1)
-    {
+   pid1 = fork();
+   if (pid1 == -1) {
         perror("Fork failed");
         exit(EXIT_FAILURE);
     }
@@ -198,42 +141,50 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
 
         // Execute cmd1
         execvp(cmd1[0], cmd1);
-
         perror("Execvp failed");
         exit(EXIT_FAILURE);
     }
-    else
-    {
-        if ((pid2 = fork()) == -1)
-        {
+   
+    pid2 fork();
+          
+    if (pid2 == -1) {
             perror("Fork failed");
             exit(EXIT_FAILURE);
         }
 
-        if (pid2 == 0)
+    if (pid2 == 0)
         {
             // Child process (cmd2)
 
             // Close unnecessary pipe ends
             close(pipe_fd1[1]); // Close write end of pipe_fd1
-            close(pipe_fd2[1]); // Close write end of pipe_fd2
+            close(pipe_fd2[0]); // Close write end of pipe_fd2
 
-            // Redirect standard input to read from pipe_fd1
-            dup2(pipe_fd1[0], STDIN_FILENO);
+            if (pipe(pipe_fd3) == -1){
+                      perror("Pipe creation failed");
+                      exit(EXIT_FAILURE);
+            }
 
-            // Close the remaining pipe ends
-            close(pipe_fd1[0]);
+            // Read from pipe_fd1 and write to cmd2
+            while ((bytes_read = read(pipe_fd1[0], buffer, sizeof(buffer))) > 0)
+            {
+                write(pipe_fd2[1], buffer, bytes_read);
+                write(pipe_fd3[1], buffer, bytes_read);    
+            }     
 
+          close(pipe_fd3[1]);
+          // Redirect standard output to write to the pipe_fd3        
+          dup2(pipe_fd3[0], STDIN_FILENO); 
+                  
             // Execute cmd2
             execvp(cmd2[0], cmd2);
-
             perror("Execvp failed");
             exit(EXIT_FAILURE);
         }
-        else
-        {
-            if ((pid3 = fork()) == -1)
-            {
+        
+          pid3 = fork();
+
+          if (pid3 == -1){
                 perror("Fork failed");
                 exit(EXIT_FAILURE);
             }
@@ -255,12 +206,9 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
 
                 // Execute cmd3
                 execvp(cmd3[0], cmd3);
-
                 perror("Execvp failed");
                 exit(EXIT_FAILURE);
             }
-            else
-            {
                 // Parent process
 
                 // Close unnecessary pipe ends
@@ -275,10 +223,4 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
                 wait(NULL);
 
                 return 0;
-            }
-        }
-    }
-
-    // This line should not be reached
-    return 0;
 }
