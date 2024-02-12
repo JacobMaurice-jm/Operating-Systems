@@ -17,6 +17,7 @@ Description:  Double pipe program.  To pipe the output from the standard
 #include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 /* prototypes */
 int doublePipe(char **,char **,char **);
