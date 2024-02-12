@@ -205,6 +205,18 @@ int doublePipe(char **cmd1, char **cmd2, char **cmd3)
         }
     }
 
+    close(pipe_fd0[0]);
+            close(pipe_fd0[1]);
+            close(pipe_fd1[0]); 
+            close(pipe_fd1[1]); 
+            close(pipe_fd2[0]);
+            close(pipe_fd2[1]); 
+
+    // Wait for all three child processes to complete
+    waitpid(pid0, NULL, 0);
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
+          
     // This line should not be reached
     return 0;
 }
